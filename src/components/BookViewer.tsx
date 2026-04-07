@@ -10,7 +10,7 @@ declare global {
 export interface Chapter {
   id: string;
   title: string;
-  content: string;
+  content: string | string[]; // Single string or array for multi-page chapters
   order: number;
 }
 
@@ -148,12 +148,99 @@ function calcPageSize() {
   };
 }
 
+// Split chapter content into multiple pages based on content height
+function splitChapterIntoPages(content: string, maxHeight: number): string[] {
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = content;
+  tempDiv.style.fontSize = '1rem';
+  tempDiv.style.lineHeight = '1.6';
+  tempDiv.style.maxWidth = '100%';
+  tempDiv.style.position = 'absolute';
+  tempDiv.style.visibility = 'hidden';
+  tempDiv.style.color = 'black';
+  document.body.appendChild(tempDiv);
+
+  const pages: string[] = [];
+  let currentPageContent = '';
+  let currentPageHeight = 0;
+  const PADDING_PER_PAGE = 40; // Account for margins
+  const effectiveMaxHeight = maxHeight - PADDING_PER_PAGE;
+  
+  // Work with child nodes to build pages
+  const nodes = Array.from(tempDiv.childNodes);
+  
+  for (const node of nodes) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const elem = node as HTMLElement;
+      const elemClone = elem.cloneNode(true) as HTMLElement;
+      
+      const testDiv = document.createElement('div');
+      testDiv.style.fontSize = '1rem';
+      testDiv.style.lineHeight = '1.6';
+      testDiv.style.maxWidth = '100%';
+      testDiv.appendChild(elemClone);
+      document.body.appendChild(testDiv);
+      
+      const elemHeight = testDiv.offsetHeight;
+      document.body.removeChild(testDiv);
+
+      // Check if element fits on current page
+      const wouldFitOnCurrentPage = currentPageHeight + elemHeight <= effectiveMaxHeight;
+      
+      if (wouldFitOnCurrentPage) {
+        // Element fits on current page
+        currentPageContent += elem.outerHTML;
+        currentPageHeight += elemHeight;
+      } else if (currentPageHeight > 0) {
+        // Element doesn't fit and page has content, start new page
+        pages.push(currentPageContent);
+        currentPageContent = elem.outerHTML;
+        currentPageHeight = elemHeight;
+      } else {
+        // Element is larger than available space but page is empty, add it anyway
+        currentPageContent += elem.outerHTML;
+        currentPageHeight += elemHeight;
+      }
+    }
+  }
+
+  if (currentPageContent) {
+    pages.push(currentPageContent);
+  }
+
+  document.body.removeChild(tempDiv);
+  
+  return pages.length > 0 ? pages : [content];
+}
+
 export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
   const bookRef = useRef<any>(null);
   const [pageSize, setPageSize] = useState(() => calcPageSize());
   const [currentPage, setCurrentPage] = useState(0);
+  const [chapterPages, setChapterPages] = useState<{ chapterId: string; pages: string[] }[]>([]);
 
-  const totalPages = chapters.length + 3;
+  // Calculate chapter pages when pageSize changes
+  useEffect(() => {
+    const maxContentHeight = pageSize.height * 0.90;
+    const newChapterPages = chapters.map(ch => {
+      // If content is already an array, use it as-is
+      if (Array.isArray(ch.content)) {
+        return {
+          chapterId: ch.id,
+          pages: ch.content,
+        };
+      }
+      // Otherwise, auto-paginate the string content
+      return {
+        chapterId: ch.id,
+        pages: splitChapterIntoPages(ch.content, maxContentHeight),
+      };
+    });
+    setChapterPages(newChapterPages);
+  }, [pageSize, chapters]);
+
+  const totalChapterPages = chapterPages.reduce((sum, cp) => sum + cp.pages.length, 0);
+  const totalPages = totalChapterPages + 3;
   const progress = Math.min((currentPage / Math.max(totalPages - 2, 1)) * 100, 100);
   const isOnCover = currentPage === 0;
 
@@ -217,16 +304,24 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
           <span className="reader-sidebar-num">—</span>
           <span>Table of Contents</span>
         </button>
-        {chapters.map((ch, idx) => (
-          <button
-            key={ch.id}
-            className={`reader-sidebar-item ${currentPage === idx + 2 ? 'active' : ''}`}
-            onClick={() => turnToPage(idx + 2)}
-          >
-            <span className="reader-sidebar-num">{String(idx + 1).padStart(2, '0')}</span>
-            <span>{ch.title}</span>
-          </button>
-        ))}
+        {chapters.map((ch, chIdx) => {
+          let pageNumber = 2; // Start after cover and TOC
+          for (let i = 0; i < chIdx; i++) {
+            const prevChapterPages = chapterPages.find(cp => cp.chapterId === chapters[i].id);
+            pageNumber += prevChapterPages?.pages.length || 1;
+          }
+          
+          return (
+            <button
+              key={ch.id}
+              className={`reader-sidebar-item ${currentPage === pageNumber ? 'active' : ''}`}
+              onClick={() => turnToPage(pageNumber)}
+            >
+              <span className="reader-sidebar-num">{String(chIdx + 1).padStart(2, '0')}</span>
+              <span>{ch.title}</span>
+            </button>
+          );
+        })}
       </aside>
 
       {/* Main content */}
@@ -300,18 +395,26 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
               <div className="toc-rule" />
             </div>
             <ul className="toc-list">
-              {chapters.map((ch, idx) => (
-                <li key={ch.id} className="toc-item">
-                  <button
-                    className="toc-btn"
-                    onClick={() => turnToPage(idx + 2)}
-                  >
-                    <span className="toc-num">{String(idx + 1).padStart(2, '0')}</span>
-                    <span className="toc-title-text">{ch.title}</span>
-                    <span className="toc-page">{idx + 3}</span>
-                  </button>
-                </li>
-              ))}
+              {chapters.map((ch, chIdx) => {
+                let pageNumber = 3; // Chapter pages start at 3 (0=cover, 1=toc, 2=first chapter or later)
+                for (let i = 0; i < chIdx; i++) {
+                  const prevChapterPages = chapterPages.find(cp => cp.chapterId === chapters[i].id);
+                  pageNumber += prevChapterPages?.pages.length || 1;
+                }
+                
+                return (
+                  <li key={ch.id} className="toc-item">
+                    <button
+                      className="toc-btn"
+                      onClick={() => turnToPage(pageNumber - 1)}
+                    >
+                      <span className="toc-num">{String(chIdx + 1).padStart(2, '0')}</span>
+                      <span className="toc-title-text">{ch.title}</span>
+                      <span className="toc-page">{pageNumber}</span>
+                    </button>
+                  </li>
+                );
+              })}
               {chapters.length === 0 && (
                 <li style={{ color: 'var(--book-text)', opacity: 0.45, fontSize: '0.82rem', padding: '1.5rem 0', fontStyle: 'italic' }}>
                   No chapters yet.
@@ -322,19 +425,27 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
           <div className="page-number-bar"><span>i</span></div>
         </div>
 
-        {/* ── Chapters ──────────────────────────────────────── */}
-        {chapters.map((ch, idx) => (
-          <div className="page" key={ch.id}>
-            <div className="page-content">
-              <div className="chapter-header">
-                <span className="chapter-number">Chapter {idx + 1}</span>
+        {chapters.map((ch, chIdx) => {
+          const chapterPageData = chapterPages.find(cp => cp.chapterId === ch.id);
+          const pages = chapterPageData?.pages || [ch.content];
+          
+          return pages.map((pageContent, pageIdx) => (
+            <div className="page" key={`${ch.id}-page-${pageIdx}`}>
+              <div className="page-content">
+                {pageIdx === 0 && (
+                  <>
+                    <div className="chapter-header">
+                      <span className="chapter-number">Chapter {chIdx + 1}</span>
+                    </div>
+                    <h2 className="chapter-title">{ch.title}</h2>
+                  </>
+                )}
+                <div dangerouslySetInnerHTML={{ __html: pageContent }} />
               </div>
-              <h2 className="chapter-title">{ch.title}</h2>
-              <div dangerouslySetInnerHTML={{ __html: ch.content }} />
+              <div className="page-number-bar"><span>{2 + totalChapterPages}</span></div>
             </div>
-            <div className="page-number-bar"><span>{idx + 3}</span></div>
-          </div>
-        ))}
+          ));
+        })}
 
         {/* ── Back Cover ────────────────────────────────────── */}
         <div className="page page-cover page-back-cover" data-density="hard">

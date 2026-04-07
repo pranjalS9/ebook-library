@@ -1,6 +1,5 @@
 ---
 import '../styles/global.css';
-import ThemeToggle from '../components/ThemeToggle';
 
 interface Props {
   title?: string;
@@ -25,14 +24,11 @@ const {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script is:inline>
-      // Set theme immediately to prevent flash of unstyled content
-      const savedTheme = localStorage.getItem('theme') || 'dark';
-      document.documentElement.setAttribute('data-theme', savedTheme);
+      document.documentElement.setAttribute('data-theme', 'light');
 
       document.addEventListener('astro:page-load', () => {
         if (typeof mermaid !== 'undefined') {
-          const theme = savedTheme === 'light' ? 'default' : 'dark';
-          mermaid.initialize({ startOnLoad: true, theme: theme });
+          mermaid.initialize({ startOnLoad: true, theme: 'default' });
         }
       });
     </script>
@@ -43,7 +39,6 @@ const {
         <span class="nav-logo-mark">◆</span>
         CS-EBooks
       </a>
-      <ThemeToggle client:only="react" />
     </nav>
     <main>
       <slot />
