@@ -155,6 +155,7 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
 
   const totalPages = chapters.length + 3;
   const progress = Math.min((currentPage / Math.max(totalPages - 2, 1)) * 100, 100);
+  const isOnCover = currentPage === 0;
 
   useEffect(() => {
     const onResize = () => setPageSize(calcPageSize());
@@ -237,6 +238,14 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
 
         {/* Book stage */}
         <div className="book-stage">
+          <div style={{
+            overflow: 'hidden',
+            width: isOnCover ? pageSize.width : pageSize.width * 2,
+            flexShrink: 0,
+          }}>
+            <div style={{
+              transform: isOnCover ? `translateX(-${pageSize.width}px)` : 'none',
+            }}>
           <HTMLFlipBook
         width={pageSize.width}
         height={pageSize.height}
@@ -355,6 +364,8 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
           </div>
         </div>
       </HTMLFlipBook>
+            </div>
+          </div>
 
           {/* Navigation Buttons */}
           <div className="book-nav">
