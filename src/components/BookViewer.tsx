@@ -161,8 +161,10 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
   const progress = Math.min((currentPage / Math.max(totalPages - 2, 1)) * 100, 100);
 
   const isOnCover = currentPage === 0;
-  // Back cover closed = onFlip fires with page index === totalPages-1
-  const isOnBackCover = backCoverClosed || currentPage === totalPages - 1;
+  // onFlip fires with the LEFT page of the spread; back cover spread starts at totalPages-2
+  const isOnBackCover = backCoverClosed || currentPage >= totalPages - 2;
+  // Back cover is on RIGHT if totalPages is odd (even page index), LEFT if totalPages is even
+  const backCoverOnRight = totalPages % 2 === 1;
 
   useEffect(() => {
     const onResize = () => setPageSize(calcPageSize(sidebarOpen));
@@ -185,7 +187,7 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
   const onFlip = (e: any) => {
     const page = e.data;
     setCurrentPage(page);
-    setBackCoverClosed(page >= totalPages - 1);
+    setBackCoverClosed(page >= totalPages - 2);
     if (window.mermaid) {
       setTimeout(() => {
         window.mermaid.init(undefined, '.mermaid');
@@ -284,7 +286,9 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
             flexShrink: 0,
           }}>
             <div style={{
-              transform: isOnCover ? `translateX(-${pageSize.width}px)` : 'translateX(0px)',
+              transform: isOnCover || (isOnBackCover && backCoverOnRight)
+                ? `translateX(-${pageSize.width}px)`
+                : 'translateX(0px)',
               transition: 'transform 300ms ease',
             }}>
       <HTMLFlipBook
@@ -307,7 +311,6 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
         flippingTime={800}
         usePortrait={false}
         startZIndex={0}
-        autoSize={true}
         clickEventForward={true}
         useMouseEvents={true}
         swipeDistance={30}
