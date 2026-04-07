@@ -130,31 +130,51 @@ const CoverIllustration = () => (
   </svg>
 );
 
-function calcPageSize() {
+const SIDEBAR_W = 260;
+
+function calcPageSize(sidebarOpen: boolean) {
   const navH = 62;
-  const bottomPad = 180; // nav buttons (42px) + margin-top (28px) + stage padding (40px) + buffer
+  const progressBarH = 3;
+  const bottomPad = 160;
   const sidePad = 48;
-  const availH = window.innerHeight - navH - bottomPad;
-  const availW = window.innerWidth - sidePad;
-  // Each page = half the spread width minus the spine gap
-  const pageW = Math.floor(availW / 2) - 16;
-  // Height fills available vertical space; width is independent
-  const pageH = availH;
+  const usedSidebar = sidebarOpen ? SIDEBAR_W : 0;
+  const availW = window.innerWidth - usedSidebar - sidePad;
+  const availH = window.innerHeight - navH - progressBarH - bottomPad;
+  const pageW = Math.floor(availW / 2) - 12;
+  const a4H = Math.floor(pageW * 1.414);
+  const pageH = Math.min(availH, a4H);
   return {
     width: Math.max(pageW, 280),
-    height: Math.max(pageH, 300),
+    height: Math.max(pageH, 396),
   };
 }
 
 export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
   const bookRef = useRef<any>(null);
-  const [pageSize, setPageSize] = useState(calcPageSize);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [pageSize, setPageSize] = useState(() => calcPageSize(true));
+  const [currentPage, setCurrentPage] = useState(0);
+  // Tracks when the back cover has been "closed" (flipped to single-page state)
+  const [backCoverClosed, setBackCoverClosed] = useState(false);
+
+  const totalPages = chapters.length + 3;
+  const progress = Math.min((currentPage / Math.max(totalPages - 2, 1)) * 100, 100);
+
+  const isOnCover = currentPage === 0;
+  // Back cover closed = onFlip fires with page index === totalPages-1
+  const isOnBackCover = backCoverClosed || currentPage === totalPages - 1;
 
   useEffect(() => {
-    const onResize = () => setPageSize(calcPageSize());
+    const onResize = () => setPageSize(calcPageSize(sidebarOpen));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [sidebarOpen]);
+
+  // Recalculate page size after sidebar CSS transition completes (250ms)
+  useEffect(() => {
+    const t = setTimeout(() => setPageSize(calcPageSize(sidebarOpen)), 260);
+    return () => clearTimeout(t);
+  }, [sidebarOpen]);
 
   useEffect(() => {
     if (window.mermaid) {
@@ -162,7 +182,10 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
     }
   }, []);
 
-  const onFlip = () => {
+  const onFlip = (e: any) => {
+    const page = e.data;
+    setCurrentPage(page);
+    setBackCoverClosed(page >= totalPages - 1);
     if (window.mermaid) {
       setTimeout(() => {
         window.mermaid.init(undefined, '.mermaid');
@@ -189,7 +212,81 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
   };
 
   return (
-    <div className="book-stage">
+    <div className="reader-layout">
+      {/* Sidebar */}
+      <aside className={`reader-sidebar${sidebarOpen ? '' : ' sidebar-closed'}`}>
+        <div className="reader-sidebar-header">
+          <p className="reader-sidebar-title">Contents</p>
+          <button
+            className="sidebar-toggle-btn"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close sidebar"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M9 2L4 7L9 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <button
+          className={`reader-sidebar-item ${currentPage === 0 ? 'active' : ''}`}
+          onClick={() => turnToPage(0)}
+        >
+          <span className="reader-sidebar-num">—</span>
+          <span>Cover</span>
+        </button>
+        <button
+          className={`reader-sidebar-item ${currentPage === 1 ? 'active' : ''}`}
+          onClick={() => turnToPage(1)}
+        >
+          <span className="reader-sidebar-num">—</span>
+          <span>Table of Contents</span>
+        </button>
+        {chapters.map((ch, idx) => (
+          <button
+            key={ch.id}
+            className={`reader-sidebar-item ${currentPage === idx + 2 ? 'active' : ''}`}
+            onClick={() => turnToPage(idx + 2)}
+          >
+            <span className="reader-sidebar-num">{String(idx + 1).padStart(2, '0')}</span>
+            <span>{ch.title}</span>
+          </button>
+        ))}
+      </aside>
+
+      {/* Main content */}
+      <div className="reader-main">
+        {/* Progress bar */}
+        <div className="reader-progress-bar">
+          <div className="reader-progress-fill" style={{ width: `${progress}%` }} />
+        </div>
+
+        {/* Sidebar reopen button — shown below progress bar when sidebar is closed */}
+        {!sidebarOpen && (
+          <button
+            className="sidebar-open-btn"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open sidebar"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M5 2L10 7L5 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span>Contents</span>
+          </button>
+        )}
+
+        {/* Book stage */}
+        <div className="book-stage">
+          {/* Clip wrapper: constrains to one page width on cover/back-cover, centering it */}
+          <div style={{
+            overflow: 'hidden',
+            width: (isOnCover || isOnBackCover) ? pageSize.width : pageSize.width * 2,
+            transition: 'width 300ms ease',
+            flexShrink: 0,
+          }}>
+            <div style={{
+              transform: isOnCover ? `translateX(-${pageSize.width}px)` : 'translateX(0px)',
+              transition: 'transform 300ms ease',
+            }}>
       <HTMLFlipBook
         width={pageSize.width}
         height={pageSize.height}
@@ -308,6 +405,8 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
           </div>
         </div>
       </HTMLFlipBook>
+            </div>{/* end transform wrapper */}
+          </div>{/* end clip wrapper */}
 
       {/* Navigation Buttons */}
       <div className="book-nav">
@@ -323,6 +422,8 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
               strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
+      </div>
+        </div>
       </div>
     </div>
   );
