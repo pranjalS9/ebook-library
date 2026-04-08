@@ -225,6 +225,7 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
   const [pageSize, setPageSize] = useState(() => calcPageSize());
   const [currentPage, setCurrentPage] = useState(0);
   const [chapterPages, setChapterPages] = useState<{ chapterId: string; pages: string[] }[]>([]);
+  const [isFlipping, setIsFlipping] = useState(false);
 
   // Calculate chapter pages when pageSize changes
   useEffect(() => {
@@ -263,7 +264,12 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
     }
   }, []);
 
+  const onChangeState = (e: any) => {
+    setIsFlipping(e.data === 'flipping' || e.data === 'fold_corner');
+  };
+
   const onFlip = (e: any) => {
+    setIsFlipping(false);
     setCurrentPage(e.data);
     if (window.mermaid) {
       setTimeout(() => {
@@ -347,7 +353,7 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
             position: 'relative',
           }}>
             {/* Spine line between left and right pages */}
-            {!isOnCover && (
+            {!isOnCover && !isFlipping && (
               <div style={{
                 position: 'absolute',
                 left: '50%',
@@ -376,6 +382,7 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
         mobileScrollSupport={true}
         ref={bookRef}
         onFlip={onFlip}
+        onChangeState={onChangeState}
         className="demo-book"
         style={{}}
         startPage={0}
