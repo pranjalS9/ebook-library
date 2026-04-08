@@ -10,12 +10,10 @@ It is a process of storing **a copy of data in a faster, temporary storage layer
 
 Every system has a speed mismatch between layers:
 
-| Operations       | Time                 |
-| ---------------- | -------------------- |
-| CPU Operations   | ~1 nanosecond        |
-| RAM Access       | ~100 nanoseconds     |
-| SSD Read         | ~100 microseconds    |
-| Network DB Query | ~10–100 milliseconds |
+CPU Operations: ~1 nanosecond\
+RAM Access: ~100 nanoseconds\
+SSD Read: ~100 microseconds\
+Network DB Query: ~10–100 milliseconds
 
 That means a DB query is 1,000,000x slower than CPU operations.<br>
 Caching solves this by absorbing the majority of reads before they reach the DB.
@@ -83,7 +81,6 @@ You can optimize for 2, but the 3rd suffers.
 * **Speed + Memory** → Consistency suffers (stale data risk)
 * **Speed + Consistency** → Memory suffers (need more cache to keep everything fresh)
 * **Consistency + Memory** → Speed suffers (frequent invalidation = more DB hits)
-* This triangle is the core tension in every caching discussion.
 
 ## Race Condition
 
@@ -101,7 +98,7 @@ cache entry ✅
                           back in cache ❌
 ```
 
->*Cache and DB can never be perfectly in sync because they're updated non-atomically. The right strategy depends on consistency requirements. For eventual consistency, TTL-based expiry is sufficient. For stronger consistency, I'd use explicit invalidation with a distributed lock using Redis SETNX to prevent race conditions during concurrent reads and writes.*
+> *Cache and DB can never be perfectly in sync because they're updated non-atomically. The right strategy depends on consistency requirements. For eventual consistency, TTL-based expiry is sufficient. For stronger consistency, I'd use explicit invalidation with a distributed lock using Redis SETNX to prevent race conditions during concurrent reads and writes.*
 
 * FIXES:
 
