@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head><title>Authenticating...</title></head>
+  <body>
+    <p>Authenticating, please wait...</p>
+    <script>
+      (function () {
+        const hash = window.location.hash.slice(1);
+        const params = new URLSearchParams(hash);
+        const token = params.get('token');
+        const error = params.get('error');
+
+        let message;
+        if (token) {
+          message = 'authorization:github:success:' + JSON.stringify({ token: token, provider: 'github' });
+        } else {
+          message = 'authorization:github:error:' + JSON.stringify({ error: error || 'unknown_error' });
+        }
+
+        if (window.opener) {
+          window.opener.postMessage(message, '*');
+          window.close();
+        } else {
+          // opener not available — redirect to admin so user isn't stuck
+          document.body.innerHTML = '<p>Authentication complete. <a href="/admin/">Return to admin</a></p>';
+        }
+      })();
+    </script>
+  </body>
+</html>
