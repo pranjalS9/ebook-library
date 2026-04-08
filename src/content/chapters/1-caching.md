@@ -60,8 +60,6 @@ Every caching decision involves balancing three things:
                  /    \
                 /______\
         CONSISTENCY    MEMORY
-
-You can optimize for 2, but the 3rd suffers.
 ```
 
 * **Speed + Memory** → Consistency suffers (stale data risk)
