@@ -1,23 +1,24 @@
 export default async function handler(req, res) {
+  res.setHeader('Content-Type', 'text/html');
+  res.statusCode = 200;
+
+  // Vercel provides req.query directly
+  const code = req.query?.code;
+  const error = req.query?.error;
+  const errorDescription = req.query?.error_description;
+
+  if (error) {
+    res.end(makeScript('error', errorDescription || error));
+    return;
+  }
+
+  if (!code) {
+    // Show debug info so we can diagnose
+    res.end(`<pre>No code found.\nreq.url: ${req.url}\nreq.query: ${JSON.stringify(req.query)}</pre>`);
+    return;
+  }
+
   try {
-    const url = new URL(req.url, 'https://ebook-library-rho.vercel.app');
-    const code = url.searchParams.get('code');
-    const error = url.searchParams.get('error');
-    const errorDescription = url.searchParams.get('error_description');
-
-    res.setHeader('Content-Type', 'text/html');
-    res.statusCode = 200;
-
-    if (error) {
-      res.end(makeScript('error', errorDescription || error));
-      return;
-    }
-
-    if (!code) {
-      res.end(makeScript('error', 'Missing code parameter'));
-      return;
-    }
-
     const response = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -35,11 +36,14 @@ export default async function handler(req, res) {
       return;
     }
 
+    if (!data.access_token) {
+      res.end(`<pre>No access_token in response: ${JSON.stringify(data)}</pre>`);
+      return;
+    }
+
     res.end(makeScript('success', data.access_token));
   } catch (err) {
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'text/html');
-    res.end(makeScript('error', String(err.message)));
+    res.end(`<pre>Exception: ${String(err)}</pre>`);
   }
 }
 
@@ -55,14 +59,14 @@ function makeScript(status, content) {
 <html>
   <head><title>Authenticating...</title></head>
   <body>
-    <p>Authenticating, please wait...</p>
+    <p>Status: ${status}. This window will close shortly...</p>
     <script>
       (function() {
         const message = ${JSON.stringify(message)};
         function send() {
           if (window.opener) {
             window.opener.postMessage(message, '*');
-            setTimeout(function() { window.close(); }, 500);
+            setTimeout(function() { window.close(); }, 1000);
           } else {
             setTimeout(send, 200);
           }
