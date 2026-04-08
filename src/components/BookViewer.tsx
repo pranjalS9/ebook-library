@@ -149,55 +149,58 @@ function calcPageSize() {
 }
 
 // Split chapter content into multiple pages based on content height
-function splitChapterIntoPages(content: string, maxHeight: number): string[] {
+function splitChapterIntoPages(content: string, maxHeight: number, pageWidth: number): string[] {
+  // Match actual .page-content horizontal padding: 1.75rem * 2 ≈ 56px
+  const HORIZ_PADDING = 56;
+  // Account for .page-content vertical padding (2rem top + 3rem bottom) + page-number-bar
+  const VERT_OVERHEAD = 110;
+  const contentWidth = Math.max(pageWidth - HORIZ_PADDING, 200);
+  const effectiveMaxHeight = maxHeight - VERT_OVERHEAD;
+
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = content;
-  tempDiv.style.fontSize = '1rem';
-  tempDiv.style.lineHeight = '1.6';
-  tempDiv.style.maxWidth = '100%';
+  // Use page-content class so child element styles (font-size, margins) match reality
+  tempDiv.className = 'page-content';
+  tempDiv.style.width = `${contentWidth}px`;
+  tempDiv.style.padding = '0';
   tempDiv.style.position = 'absolute';
+  tempDiv.style.left = '-9999px';
+  tempDiv.style.top = '0';
   tempDiv.style.visibility = 'hidden';
-  tempDiv.style.color = 'black';
   document.body.appendChild(tempDiv);
 
   const pages: string[] = [];
   let currentPageContent = '';
   let currentPageHeight = 0;
-  const PADDING_PER_PAGE = 40; // Account for margins
-  const effectiveMaxHeight = maxHeight - PADDING_PER_PAGE;
-  
-  // Work with child nodes to build pages
+
   const nodes = Array.from(tempDiv.childNodes);
-  
+
   for (const node of nodes) {
     if (node.nodeType === Node.ELEMENT_NODE) {
       const elem = node as HTMLElement;
-      const elemClone = elem.cloneNode(true) as HTMLElement;
-      
+
       const testDiv = document.createElement('div');
-      testDiv.style.fontSize = '1rem';
-      testDiv.style.lineHeight = '1.6';
-      testDiv.style.maxWidth = '100%';
-      testDiv.appendChild(elemClone);
+      testDiv.className = 'page-content';
+      testDiv.style.width = `${contentWidth}px`;
+      testDiv.style.padding = '0';
+      testDiv.style.position = 'absolute';
+      testDiv.style.left = '-9999px';
+      testDiv.style.top = '0';
+      testDiv.innerHTML = elem.outerHTML;
       document.body.appendChild(testDiv);
-      
+
       const elemHeight = testDiv.offsetHeight;
       document.body.removeChild(testDiv);
 
-      // Check if element fits on current page
-      const wouldFitOnCurrentPage = currentPageHeight + elemHeight <= effectiveMaxHeight;
-      
-      if (wouldFitOnCurrentPage) {
-        // Element fits on current page
+      if (currentPageHeight + elemHeight <= effectiveMaxHeight) {
         currentPageContent += elem.outerHTML;
         currentPageHeight += elemHeight;
       } else if (currentPageHeight > 0) {
-        // Element doesn't fit and page has content, start new page
         pages.push(currentPageContent);
         currentPageContent = elem.outerHTML;
         currentPageHeight = elemHeight;
       } else {
-        // Element is larger than available space but page is empty, add it anyway
+        // Element taller than a full page — add it anyway to avoid infinite loop
         currentPageContent += elem.outerHTML;
         currentPageHeight += elemHeight;
       }
@@ -209,7 +212,7 @@ function splitChapterIntoPages(content: string, maxHeight: number): string[] {
   }
 
   document.body.removeChild(tempDiv);
-  
+
   return pages.length > 0 ? pages : [content];
 }
 
@@ -221,7 +224,7 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
 
   // Calculate chapter pages when pageSize changes
   useEffect(() => {
-    const maxContentHeight = pageSize.height * 0.90;
+    const maxContentHeight = pageSize.height;
     const newChapterPages = chapters.map(ch => {
       // If content is already an array, use it as-is
       if (Array.isArray(ch.content)) {
@@ -233,7 +236,7 @@ export default function BookViewer({ chapters }: { chapters: Chapter[] }) {
       // Otherwise, auto-paginate the string content
       return {
         chapterId: ch.id,
-        pages: splitChapterIntoPages(ch.content, maxContentHeight),
+        pages: splitChapterIntoPages(ch.content, maxContentHeight, pageSize.width),
       };
     });
     setChapterPages(newChapterPages);
