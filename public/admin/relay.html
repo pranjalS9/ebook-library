@@ -10,20 +10,39 @@
         const token = params.get('token');
         const error = params.get('error');
 
-        let message;
-        if (token) {
-          message = 'authorization:github:success:' + JSON.stringify({ token: token, provider: 'github' });
-        } else {
-          message = 'authorization:github:error:' + JSON.stringify({ error: error || 'unknown_error' });
+        if (token && window.opener) {
+          const message = 'authorization:github:success:' + JSON.stringify({ token: token, provider: 'github' });
+          window.opener.postMessage(message, '*');
+          window.close();
+          return;
         }
+
+        if (token && !window.opener) {
+          document.body.innerHTML = `
+            <h1>Authentication complete</h1>
+            <p>Your login succeeded, but the admin window could not be reached.</p>
+            <p>Please return to <a href="/admin/">admin</a> and try again with popups enabled.</p>
+            <pre style="white-space: pre-wrap; background:#f5f5f5; padding:1rem; border-radius:0.5rem; color:#111; overflow:auto;">token: ${token}</pre>
+          `;
+          return;
+        }
+
+        const errorMsg = error || 'unknown_error';
+        const message = 'authorization:github:error:' + JSON.stringify({ error: errorMsg });
 
         if (window.opener) {
           window.opener.postMessage(message, '*');
           window.close();
-        } else {
-          // opener not available — redirect to admin so user isn't stuck
-          document.body.innerHTML = '<p>Authentication complete. <a href="/admin/">Return to admin</a></p>';
+          return;
         }
+
+        document.body.innerHTML = `
+          <h1>Authentication failed</h1>
+          <p>There was a problem returning the login result to the admin window.</p>
+          <p>Error: <strong>${errorMsg}</strong></p>
+          <p>Please allow popups for this site and try again.</p>
+          <p><a href="/admin/">Return to admin</a></p>
+        `;
       })();
     </script>
   </body>
