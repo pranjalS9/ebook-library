@@ -1,10 +1,44 @@
 export default async function handler(req, res) {
-  // Debug: show exactly what URL and query Vercel receives
-  res.setHeader('Content-Type', 'text/plain');
-  res.statusCode = 200;
-  res.end(
-    'req.url: ' + req.url + '\n' +
-    'req.query: ' + JSON.stringify(req.query) + '\n' +
-    'method: ' + req.method
-  );
+  const code = req.query.code;
+  const error = req.query.error;
+  const errorDescription = req.query.error_description;
+
+  if (error) {
+    res.writeHead(302, { Location: `/admin/relay.html#error=${encodeURIComponent(errorDescription || error)}` });
+    res.end();
+    return;
+  }
+
+  if (!code) {
+    res.writeHead(302, { Location: `/admin/relay.html#error=missing_code` });
+    res.end();
+    return;
+  }
+
+  try {
+    const response = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        code,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.error || !data.access_token) {
+      const msg = data.error_description || data.error || 'no_token';
+      res.writeHead(302, { Location: `/admin/relay.html#error=${encodeURIComponent(msg)}` });
+      res.end();
+      return;
+    }
+
+    res.writeHead(302, { Location: `/admin/relay.html#token=${encodeURIComponent(data.access_token)}` });
+    res.end();
+  } catch (err) {
+    res.writeHead(302, { Location: `/admin/relay.html#error=${encodeURIComponent(String(err))}` });
+    res.end();
+  }
 }
