@@ -1,4 +1,4 @@
-module.exports = function handler(req, res) {
+export default function handler(req, res) {
   try {
     const clientId = process.env.GITHUB_CLIENT_ID;
 
@@ -26,4 +26,4 @@ module.exports = function handler(req, res) {
     res.setHeader('Content-Type', 'text/plain');
     res.end('Error in /api/auth: ' + String(err));
   }
-};
+}

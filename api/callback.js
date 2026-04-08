@@ -1,30 +1,26 @@
-module.exports = async function handler(req, res) {
-  const url = new URL(req.url, 'https://ebook-library-rho.vercel.app');
-  const code = url.searchParams.get('code');
-  const error = url.searchParams.get('error');
-  const errorDescription = url.searchParams.get('error_description');
-
-  res.setHeader('Content-Type', 'text/html');
-
-  if (error) {
-    res.statusCode = 200;
-    res.end(makeScript('error', errorDescription || error));
-    return;
-  }
-
-  if (!code) {
-    res.statusCode = 200;
-    res.end(makeScript('error', 'Missing code parameter'));
-    return;
-  }
-
+export default async function handler(req, res) {
   try {
+    const url = new URL(req.url, 'https://ebook-library-rho.vercel.app');
+    const code = url.searchParams.get('code');
+    const error = url.searchParams.get('error');
+    const errorDescription = url.searchParams.get('error_description');
+
+    res.setHeader('Content-Type', 'text/html');
+    res.statusCode = 200;
+
+    if (error) {
+      res.end(makeScript('error', errorDescription || error));
+      return;
+    }
+
+    if (!code) {
+      res.end(makeScript('error', 'Missing code parameter'));
+      return;
+    }
+
     const response = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
         client_id: process.env.GITHUB_CLIENT_ID,
         client_secret: process.env.GITHUB_CLIENT_SECRET,
@@ -35,18 +31,17 @@ module.exports = async function handler(req, res) {
     const data = await response.json();
 
     if (data.error) {
-      res.statusCode = 200;
       res.end(makeScript('error', data.error_description || data.error));
       return;
     }
 
-    res.statusCode = 200;
     res.end(makeScript('success', data.access_token));
   } catch (err) {
     res.statusCode = 200;
+    res.setHeader('Content-Type', 'text/html');
     res.end(makeScript('error', String(err.message)));
   }
-};
+}
 
 function makeScript(status, content) {
   const payload =
