@@ -1,9 +1,16 @@
 // OAuth callback — exchanges GitHub code for access token, returns it to Decap CMS
 export default async function handler(req, res) {
-  const { code } = req.query;
+  const { code, error, error_description } = req.query;
+
+  if (error) {
+    res.setHeader('Content-Type', 'text/html');
+    res.send(makeScript('error', error_description || error));
+    return;
+  }
 
   if (!code) {
-    res.status(400).send('Missing code parameter');
+    res.setHeader('Content-Type', 'text/html');
+    res.send(makeScript('error', 'Missing code parameter'));
     return;
   }
 
@@ -24,35 +31,47 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (data.error) {
-      res.status(400).send(`GitHub OAuth error: ${data.error_description}`);
+      res.setHeader('Content-Type', 'text/html');
+      res.send(makeScript('error', data.error_description || data.error));
       return;
     }
 
-    // Send the token back to Decap CMS via postMessage
     res.setHeader('Content-Type', 'text/html');
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-        <body>
-          <script>
-            (function() {
-              const token = ${JSON.stringify(data.access_token)};
-              const provider = 'github';
-              const message = JSON.stringify({ token, provider });
-              // Post to opener (the CMS window)
-              if (window.opener) {
-                window.opener.postMessage(
-                  'authorization:github:success:' + message,
-                  '*'
-                );
-              }
-              window.close();
-            })();
-          </script>
-        </body>
-      </html>
-    `);
+    res.send(makeScript('success', data.access_token));
   } catch (err) {
-    res.status(500).send('OAuth exchange failed');
+    res.setHeader('Content-Type', 'text/html');
+    res.send(makeScript('error', 'OAuth exchange failed'));
   }
+}
+
+function makeScript(status, content) {
+  const payload =
+    status === 'success'
+      ? JSON.stringify({ token: content, provider: 'github' })
+      : JSON.stringify({ error: content });
+
+  const message = `authorization:github:${status}:${payload}`;
+
+  return `<!DOCTYPE html>
+<html>
+  <head><title>Authenticating...</title></head>
+  <body>
+    <p>Authenticating, please wait...</p>
+    <script>
+      (function() {
+        const message = ${JSON.stringify(message)};
+        function send() {
+          if (window.opener) {
+            window.opener.postMessage(message, '*');
+            setTimeout(function() { window.close(); }, 500);
+          } else {
+            // Fallback: try again shortly
+            setTimeout(send, 200);
+          }
+        }
+        send();
+      })();
+    </script>
+  </body>
+</html>`;
 }
