@@ -51,8 +51,6 @@ Cache data that is read often, written rarely, and tolerable to be slightly stal
 
 ## The Cache Trade-off Triangle
 
-Every caching decision involves balancing three things:
-
 ```markdown
                  SPEED
                    /\
