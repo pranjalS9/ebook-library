@@ -11,10 +11,7 @@ Caching solves this by absorbing the majority of reads before they reach the DB.
 
 ## Why Caching?
 
-* Reduce Latency
-
-  * **Without cache**: User → App → DB → App → User   (~50–100ms) 
-  * **With cache**: User → App → Cache → User       (~1–5ms). <br>Improvement: 10x to 100x faster response
+* Reduce Latency: User → App → Cache → User (10x to 100x faster response)
 * Reduce Database Load
 
   * **Without cache**: 10,000 req/sec → 10,000 DB queries/sec → DB overwhelmed <br>
@@ -87,5 +84,4 @@ cache entry ✅
                           back in cache ❌
 ```
 
-> *Cache and DB can never be perfectly in sync because they're updated non-atomically. The right strategy depends on consistency requirements. For eventual consistency, TTL-based expiry is sufficient. For stronger consistency, I'd use explicit invalidation with a distributed lock using Redis SETNX to prevent race conditions during concurrent reads and writes.*\
-> Fixes: TTL, Invalidation, Locks
+> *Cache and DB can never be perfectly in sync because they're updated non-atomically. The right strategy depends on consistency requirements. For eventual consistency, TTL-based expiry is sufficient. For stronger consistency, I'd use explicit invalidation with a distributed lock using Redis SETNX to prevent race conditions during concurrent reads and writes.*
