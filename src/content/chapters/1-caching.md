@@ -82,7 +82,7 @@ Cache data that is read often, written rarely, and tolerable to be slightly stal
 
 Every caching decision involves balancing three things:
 
-```
+```markdown
                  SPEED
                    /\
                   /  \
