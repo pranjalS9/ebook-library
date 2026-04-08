@@ -1,17 +1,12 @@
 export default async function handler(req, res) {
   const code = req.query.code;
   const error = req.query.error;
-  const errorDescription = req.query.error_description;
 
-  if (error) {
-    res.writeHead(302, { Location: `/admin/relay.html#error=${encodeURIComponent(errorDescription || error)}` });
-    res.end();
-    return;
-  }
+  res.setHeader('Content-Type', 'text/html');
+  res.statusCode = 200;
 
-  if (!code) {
-    res.writeHead(302, { Location: `/admin/relay.html#error=missing_code` });
-    res.end();
+  if (error || !code) {
+    res.end(html('error', JSON.stringify({ error: error || 'missing_code' })));
     return;
   }
 
@@ -29,16 +24,32 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (data.error || !data.access_token) {
-      const msg = data.error_description || data.error || 'no_token';
-      res.writeHead(302, { Location: `/admin/relay.html#error=${encodeURIComponent(msg)}` });
-      res.end();
+      res.end(html('error', JSON.stringify({ error: data.error_description || data.error || 'no_token' })));
       return;
     }
 
-    res.writeHead(302, { Location: `/admin/relay.html#token=${encodeURIComponent(data.access_token)}` });
-    res.end();
+    res.end(html('success', JSON.stringify({ token: data.access_token, provider: 'github' })));
   } catch (err) {
-    res.writeHead(302, { Location: `/admin/relay.html#error=${encodeURIComponent(String(err))}` });
-    res.end();
+    res.end(html('error', JSON.stringify({ error: String(err) })));
   }
+}
+
+function html(status, payload) {
+  const msg = `authorization:github:${status}:${payload}`;
+  return `<!DOCTYPE html><html><body><script>
+  (function() {
+    var msg = ${JSON.stringify(msg)};
+    function attempt(n) {
+      if (window.opener) {
+        window.opener.postMessage(msg, '*');
+        setTimeout(function(){ window.close(); }, 500);
+      } else if (n < 10) {
+        setTimeout(function(){ attempt(n+1); }, 300);
+      } else {
+        document.body.innerHTML = '<p>Close this window and try again. Make sure popups are allowed.</p>';
+      }
+    }
+    attempt(0);
+  })();
+  </script></body></html>`;
 }
