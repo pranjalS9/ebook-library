@@ -1,15 +1,20 @@
 module.exports = async function handler(req, res) {
-  const { code, error, error_description } = req.query;
+  const url = new URL(req.url, 'https://ebook-library-rho.vercel.app');
+  const code = url.searchParams.get('code');
+  const error = url.searchParams.get('error');
+  const errorDescription = url.searchParams.get('error_description');
+
+  res.setHeader('Content-Type', 'text/html');
 
   if (error) {
-    res.setHeader('Content-Type', 'text/html');
-    res.send(makeScript('error', error_description || error));
+    res.statusCode = 200;
+    res.end(makeScript('error', errorDescription || error));
     return;
   }
 
   if (!code) {
-    res.setHeader('Content-Type', 'text/html');
-    res.send(makeScript('error', 'Missing code parameter'));
+    res.statusCode = 200;
+    res.end(makeScript('error', 'Missing code parameter'));
     return;
   }
 
@@ -30,16 +35,16 @@ module.exports = async function handler(req, res) {
     const data = await response.json();
 
     if (data.error) {
-      res.setHeader('Content-Type', 'text/html');
-      res.send(makeScript('error', data.error_description || data.error));
+      res.statusCode = 200;
+      res.end(makeScript('error', data.error_description || data.error));
       return;
     }
 
-    res.setHeader('Content-Type', 'text/html');
-    res.send(makeScript('success', data.access_token));
+    res.statusCode = 200;
+    res.end(makeScript('success', data.access_token));
   } catch (err) {
-    res.setHeader('Content-Type', 'text/html');
-    res.send(makeScript('error', 'OAuth exchange failed'));
+    res.statusCode = 200;
+    res.end(makeScript('error', String(err.message)));
   }
 };
 
